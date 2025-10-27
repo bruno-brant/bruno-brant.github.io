@@ -1,158 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  
-        
-    <url>
-      <loc>https://blog.brunobrant.net/A-Contrarian-View-On-Battlefield-6/</loc>
-      <lastmod>2025-09-10T00:00:00+00:00</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.5</priority>
-    </url>
-    
-  
-        
-    <url>
-      <loc>https://blog.brunobrant.net/from-scratch-drawing/</loc>
-      <lastmod>2024-11-30T00:00:00+00:00</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.5</priority>
-    </url>
-    
-  
-        
-    <url>
-      <loc>https://blog.brunobrant.net/Excellent-Talk-On-Software-Complexity/</loc>
-      <lastmod>2024-11-29T00:00:00+00:00</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.5</priority>
-    </url>
-    
-  
-        
-    <url>
-      <loc>https://blog.brunobrant.net/parsing-code-with-sprache-part-2/</loc>
-      <lastmod>2021-03-13T10:00:00+00:00</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.5</priority>
-    </url>
-    
-  
-        
-    <url>
-      <loc>https://blog.brunobrant.net/read-my-blog-in-portuguese/</loc>
-      <lastmod>2021-02-17T00:00:00+00:00</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.5</priority>
-    </url>
-    
-  
-        
-    <url>
-      <loc>https://blog.brunobrant.net/parsing-code-with-sprache/</loc>
-      <lastmod>2021-02-13T10:00:00+00:00</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.5</priority>
-    </url>
-    
-  
-        
-    <url>
-      <loc>https://blog.brunobrant.net/happy-halloween-blog-is-back/</loc>
-      <lastmod>2020-10-31T18:00:00+00:00</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.5</priority>
-    </url>
-    
-  
-  
-    
   <url>
-    <loc>https://blog.brunobrant.net/404.html</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
+    <loc>https://blog.brunobrant.net/en/blog/2020-10-31-happy-halloween-blog-is-back</loc>
+    <lastmod>2020-10-31T18:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/en/blog/2021-02-17-read-my-blog-in-portuguese</loc>
+    <lastmod>2021-02-17T00:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/en/blog/2024-11-29-excellent-talk-on-software-complexity</loc>
+    <lastmod>2024-11-29T00:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/en/blog/2025-08-01-a-contrarian-view-on-battlefield-6</loc>
+    <lastmod>2025-09-10T00:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/pt-br/blog/2020-10-31-happy-halloween-blog-is-back</loc>
+    <lastmod>2020-10-31T18:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/pt-br/blog/2021-02-17-read-my-blog-in-portuguese</loc>
+    <lastmod>2021-02-17T00:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/en/blog/2021-03-13-parsing-code-with-sprache-part-2</loc>
+    <lastmod>2021-03-13T10:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/pt-br/blog/2021-03-13-parsing-code-with-sprache-part-2</loc>
+    <lastmod>2021-03-13T10:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/en/blog/2021-02-13-parsing-code-with-sprache</loc>
+    <lastmod>2021-02-13T10:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/pt-br/blog/2021-02-13-parsing-code-with-sprache</loc>
+    <lastmod>2021-02-13T10:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/pt-br/blog/2024-11-29-excellent-talk-on-software-complexity</loc>
+    <lastmod>2024-11-29T00:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/pt-br/blog/2025-08-01-a-contrarian-view-on-battlefield-6</loc>
+    <lastmod>2025-09-10T00:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://blog.brunobrant.net/en/about</loc>
+    <lastmod>2025-10-27T00:32:38.362Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>
-  
   <url>
-    <loc>https://blog.brunobrant.net/about/</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
+    <loc>https://blog.brunobrant.net/pt-br/about</loc>
+    <lastmod>2025-10-27T00:32:38.362Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>
-  
-  <url>
-    <loc>https://blog.brunobrant.net/announcements.xml</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
-    <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  
-  <url>
-    <loc>https://blog.brunobrant.net/archive/</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
-    <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  
-  <url>
-    <loc>https://blog.brunobrant.net/categories/</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
-    <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  
-  <url>
-    <loc>https://blog.brunobrant.net/feed.xml</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
-    <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  
   <url>
     <loc>https://blog.brunobrant.net/</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
+    <lastmod>2025-10-27T00:32:38.362Z</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
+    <priority>1.0</priority>
   </url>
-  
-  <url>
-    <loc>https://blog.brunobrant.net/sitemap.xml</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
-    <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  
-  <url>
-    <loc>https://blog.brunobrant.net/styles.css</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
-    <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  
-  <url>
-    <loc>https://blog.brunobrant.net/tags/</loc>
-    
-      <lastmod>2025-09-10T14:39:17+00:00</lastmod>
-    
-    <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  
 </urlset>

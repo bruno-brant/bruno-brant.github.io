@@ -1,0 +1,357 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta property="og:image" content="/technology-matters.svg"><title>Parsing code with Sprache - Part 1 · TECHNOLOGY MATTERS</title><link rel="shortcut icon" href="/favicon.ico"><link rel="alternate" type="application/atom+xml" title="TECHNOLOGY MATTERS" href="/rss.xml"><!-- Country flags from open source project--><link rel="stylesheet" type="text/css" href="/styles/flags16-both.css"><!-- Analytics script --><script>
+		if(!sessionStorage.getItem("_swa") && document.referrer.indexOf(location.protocol+"//"+location.host) !== 0) {
+			fetch("https://counter.dev/track?" + new URLSearchParams({
+				referrer: document.referrer,
+				screen: screen.width + "x" + screen.height,
+				user: "HeavyStorm",
+				utcoffset: "-3"
+			}));
+		}
+		sessionStorage.setItem("_swa", "1");
+	</script><link rel="stylesheet" href="/_astro/_slug_.C4Cg-swM.css"></head><body> <div class="container content"> <header class="masthead"> <h3 class="masthead-title"> <a href="/en/" title="Home" class="masthead-title-main"> TECHNOLOGY MATTERS </a> <br> <small>a bunch of unsorted thoughts about tech, software, etc.</small> </h3> <!-- Navigation --> <div class="navigation"> <ul id="navigation-list"> <li class> <a href="/en/">HOME</a> </li> <li class> <a href="/en/archive/">ARCHIVE</a> </li> <li> <a href="/en/tags/">TAGS</a> </li> <li> <a href="/en/categories/">CATEGORIES</a> </li> <li class> <a href="/en/about/">ABOUT</a> </li> <li id="subscribe"> <a href="/rss.xml"> <p>SUBSCRIBE</p> <svg class="svg-icon grey" style="fill: #f66a0a;"> <use xlink:href="/minima-social-icons.svg#rss"></use> </svg> </a> </li> </ul> <div style="float:right"> <a href="javascript:void(0);" class="navigation-icon" onclick="openNavigation()">&#9776;</a> </div> </div> <!-- Language selector --> <script>(function(){const pathWithoutLocale = "/blog/2021-02-13-parsing-code-with-sprache/";
+const locales = ["en","pt-br"];
+
+	document.setPreferredLanguage = function (path, locale) {
+		localStorage.setItem("preferredLanguage", locale);
+		window.location.href = `/${path}${pathWithoutLocale}`;
+	}
+})();</script> <div class="language-selector f16"> <span class="language-selector-label">read this site in: </span>  <a onclick="document.setPreferredLanguage('en', 'en'); return false;" href="#"> <img class="flag us" style="vertical-align:middle;margin-bottom:-0.0em" src="/Transparent32x32.png" alt="English"> </a>  |  <a onclick="document.setPreferredLanguage('pt-br', 'pt-br'); return false;" href="#"> <img class="flag br" style="vertical-align:middle;margin-bottom:-0.0em" src="/Transparent32x32.png" alt="English"> </a>  </div> </header> <main>  <main> <article class="post"> <h1 class="post-title">Parsing code with Sprache - Part 1</h1> <time datetime="2021-02-13T10:00:00.000Z" class="post-date"> February 13, 2021  in  <a href="/categories/#development">Development</a>   <br> <i>Last updated on: February 13, 2021</i>  </time>  <div class="content">  <blockquote>
+<p>😎 This the first article of a multiple part series on how to parse code with Sprache. You can read the second part <a href="2021-03-13-parsing-code-with-sprache-part-2">here</a>.</p>
+</blockquote>
+<p>You probably know that sometimes (<em>many</em> times), a developer’s job is much more research or analysis than programming! In the past, there have been many instances where I was on a project where my goal was to migrate or rewrite old software, and during those engagements, I ended up creating tools to help me. Many of those tools were specialized code parsers that would automatically perform the analysis I required or even spit out newer code that I could reuse.</p>
+<p>In all those cases, I needed to parse some structured code, and there’s a simple way of doing this: by using <a href="https://github.com/sprache/Sprache">Sprache</a>, a parsing framework for dotnet. In this article, I’m going to teach you how to do that.</p>
+<!--more-->
+<h1 id="parsing-java-code">Parsing Java code</h1>
+<p>You can write all sorts of parsers with Sprache. As long as the language is formal, it’s easy to build the necessary code, and you do that leveraging all of C# syntax greatness. I will propose an example: a parser to a <strong>partial</strong> Java ☕ grammar.</p>
+<p>I’m choosing Java because it’s complex enough to let us see how Sprache can make your life easier; because Java is close to C#, so readers will quickly understand most of it; and because Java’s formal grammar is structured in such a way that one can extrapolate its grammar without much research.</p>
+<p>Of course, writing a full parser would take too long; we will have to constrain ourselves to a partial analyzer. The way we do that is to get the code we want to parse and then specify the grammar for just that (I call this approach <em>best fit</em>, an important agile principle). So I decided on a victim for this endeavor: <a href="https://github.com/google/google-authenticator-android/tree/master/java/com/google/android/apps/authenticator">Google Authenticator</a> is the source of an Android app that generates OTP’s. The app can be found in the <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&#x26;hl=en_US&#x26;gl=US">Play Store</a>.</p>
+<blockquote>
+<p>😎 I’ve used this source code to reproduce the OTP algorithm, so I’m familiar with it.</p>
+</blockquote>
+<p>To have a tangible goal, we will output a graph of class dependencies; This should help you get how to do more than just the parsing but also how to use the parsed code to get insight or produce other artifacts.</p>
+<h1 id="java-bnf">Java BNF</h1>
+<p>The starting point for our code is the formal grammar for Java. The <a href="https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form">eBNF</a> - Extended Backus-Naur Form or notation - is a description of a formal grammar. For instance, a <code>for</code> block in Java can be:</p>
+<p>Example:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="java"><code><span class="line"><span style="color:#F97583">for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">int</span><span style="color:#E1E4E8"> i </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">; i </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 100</span><span style="color:#E1E4E8">; i</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">) { System.out.</span><span style="color:#B392F0">println</span><span style="color:#E1E4E8">(i); }</span></span></code></pre>
+<p>Grammar:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FORBLOCK = "for" "(" INITIALIZER ";" CONDITION ";" INCREMENT) BLOCK</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>INITIALIZER = ASSIGNMENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>ASSIGNMENT = TYPE VARIABLE "=" LITERAL </span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>CONDITION = BOOLEAN_EXPRESSION</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>INCREMENT = VARIABLE "++" | "++" VARIABLE</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>BLOCK = STATEMENT | "{" STATEMENT_LIST "}"</span></span></code></pre>
+<blockquote>
+<p>❗ This grammar is incomplete and not necessarily correct; This is a practical guide on using Sprache, not on BNF and formal languages.</p>
+</blockquote>
+<p>So we begin by looking at our target code and creating a small grammar. To keep things simple, we will be writing parsers for every source in <code>java/com/google/android/apps/authenticator/</code> and ignore non-java files.</p>
+<p>For instance, take a look at <a href="https://github.com/google/google-authenticator-android/blob/master/java/com/google/android/apps/authenticator/AuthenticatorActivity.java">AuthenticatorActivity.java</a>, the first file in scope. You will see that the first few lines are comments, and then we have a <code>package</code> instruction, followed by several <code>import</code> statements, and finally a <code>class</code> definition. Excluding the comments (we will touch on that later), the grammar would be:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>JAVA_FILE = PACKAGE, IMPORT_LIST, CLASS_DECLARATIONS; </span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>PACKAGE = "package", PACKAGE_NAME, ";";</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>PACKAGE_NAME = WORD, { "." WORD };</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>WORD = CHARACTER, { CHARACTER };</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>CHARACTER = LETTER | DIGIT;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>IMPORT_LIST = IMPORT, { IMPORT };</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>IMPORT = "import", PACKAGE_NAME, ";";</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>CLASS_DECLARATION = "public", "class", WORD, "{" (* ommited *) "}";</span></span></code></pre>
+<p>Take a look at that language, compare it to the file, but check it against your knowledge of Java (or C#, just by realizing that those two languages are very similar). On one hand, you’ll probably see that the grammar above could be used to produce the source code; on the other, you’ll quickly realize that it doesn’t account for many constructs that are legal in Java: for instance, a source could have no <code>import</code>s whatsoever. That’s what I meant by <em>best fit</em> - we are looking for a way to parse <strong>only</strong> the code in scope.</p>
+<h1 id="setting-up-the-project">Setting up the project</h1>
+<p>Once we have a small grammar, we can start to code. Create a new dotnet library project, add Sprache to it via Nuget, create an additional test project with xUnit, and download Google Authenticator’s source to a directory.</p>
+<p>We will define data structures to store each element of our grammar, and a test to check if the parse worked as expected.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#6A737D">// BNF classes</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> JavaFile</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> Package</span><span style="color:#B392F0"> Package</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">private</span><span style="color:#F97583"> set</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Import</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">ImportList</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">private</span><span style="color:#F97583"> set</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> ClassDefinition</span><span style="color:#B392F0"> ClassDefinition</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">private</span><span style="color:#F97583"> set</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> Package</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> PackageName</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">set</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> PackageName</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8">() {}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">identifers</span><span style="color:#E1E4E8">) </span></span>
+<span class="line"><span style="color:#E1E4E8">	{ </span></span>
+<span class="line"><span style="color:#E1E4E8">		Identifiers </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> identifers;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">Identifiers</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; } </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">>();</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> Import</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> PackageName</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">set</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> ClassDefinition</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#6A737D">    // OMMITED</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>A few important things to note on the structure above:</p>
+<ul>
+<li>I didn’t define ImportList or any list structures - I simply used the <code>List</code> generic from C#.</li>
+<li>I didn’t define a WORD construct yet - I will be storing those simply as strings for the time being since we’re not interested in it.</li>
+</ul>
+<p>Now, how does a parser looks like? We need something that can get the data from the source - text, after all - and produce the structures above:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">interface</span><span style="color:#B392F0"> IParser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">T</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">    T</span><span style="color:#B392F0"> Parse</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> code</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>This is a basic parser for a certain definition <code>T</code> - it’s just a single method that reads a string and returns the desired structure.  We’ll begin by declaring one of the basics parsers, the <code>Package</code> parser. <em>We’ll revisit this structure in time.</em></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> PackageNameParser</span><span style="color:#E1E4E8"> : </span><span style="color:#B392F0">IParser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Package</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> Package</span><span style="color:#B392F0"> Parse</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> code</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> NotImplementedException</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>This will be our starting point for the parser.</p>
+<p>With those classes defined, we can move into setting up the tests.</p>
+<h1 id="the-first-few-tests">The first few tests</h1>
+<blockquote>
+<p>😎 Always write tests first.</p>
+</blockquote>
+<p>I’ll be using xUnit, which is probably the best testing framework for C#. You can adapt the code below to anything you want, though.</p>
+<p>The first test case should be a warm-up, so we test what happens when code is <code>null</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> PackageNameParserTests</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#E1E4E8">    [</span><span style="color:#B392F0">Fact</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenCodeNull_Throws</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        var</span><span style="color:#B392F0"> sut</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageNameParser</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        Assert.</span><span style="color:#B392F0">Throws</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ArgumentNullException</span><span style="color:#E1E4E8">>(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> sut.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">));</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Run the test - it will fail, as usual, complying with a <em>red-green-refactor</em> approach. The next step is to turn it green:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> PackageNameParser</span><span style="color:#E1E4E8"> : </span><span style="color:#B392F0">IParser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> PackageName</span><span style="color:#B392F0"> Parse</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> code</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (code </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ArgumentNullException</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">nameof</span><span style="color:#E1E4E8">(code));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> NotImplementedException</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Run it again and the test will pass. The warm-up is done, our next step is to create a happy path. We want to test that we can correctly capture the package name:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">Fact</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenValidPackage_ReturnsName</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    var</span><span style="color:#B392F0"> packageExpresison</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "package tinyJavaParser;"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    var</span><span style="color:#B392F0"> sut</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageNameParser</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    </span></span>
+<span class="line"><span style="color:#F97583">    var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> sut.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(packageExpresison);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"tinyJavaParser"</span><span style="color:#E1E4E8">, actual.Indentifiers[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">]);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Run it and the test will fail. Let’s implement our first Sprache parser!</p>
+<h2 id="sprache-parsers">Sprache parsers</h2>
+<p>If you take a look at Sprache’s README, you’ll quickly grasp how to work with it. All begins with the static <code>Parse</code> object, which call be called to parse multiple types of texts. You build a complex parser by combining those basic parsers using LINQ.</p>
+<p>For instance, our package name is a string made up of chars, so we can use <code>Sprache.Parse.Letter</code> to parse it, but first we must account for the <code>package</code> keyword and whitespace that comes before:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#B392F0">Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">parser</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">    from</span><span style="color:#B392F0"> packageKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"package"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">    from</span><span style="color:#B392F0"> space</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.WhiteSpace.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">    from</span><span style="color:#B392F0"> packageName</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.Letter.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Text</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">    from</span><span style="color:#B392F0"> ending</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8"> { Indentifiers </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">> { packageName } };</span></span></code></pre>
+<p>Let’s look at it line by line. First, we account for the package keyword, stating clearly that it must appear only <strong>once</strong>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">from</span><span style="color:#B392F0"> packageKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"package"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span></code></pre>
+<p>Then we know that there’ll be some spaces between the keyword and the identifier:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">    from</span><span style="color:#B392F0"> space1</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.WhiteSpace.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span></code></pre>
+<p>After that we extract the package name, which is a sequence of letters:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">    from</span><span style="color:#B392F0"> packageName</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.Letter.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Text</span><span style="color:#E1E4E8">()</span></span></code></pre>
+<p>And finally, we make sure the line ends with a <code>;</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">    from</span><span style="color:#B392F0"> ending</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p>Once we did all that, we can produce the parsed structure, <code>PackageName</code>, using the data we gathered before:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#E1E4E8">    select </span><span style="color:#F97583">new</span><span style="color:#E1E4E8"> PackageName { Indentifiers </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#E1E4E8">() { packageName } };</span></span></code></pre>
+<p>Let’s use this knowledge and implement the method:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#B392F0"> PackageName</span><span style="color:#B392F0"> Parse</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> code</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (code </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ArgumentNullException</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">nameof</span><span style="color:#E1E4E8">(code));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">parser</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> packageKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"package"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> space</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.WhiteSpace.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> packageName</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.Letter.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Text</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> ending</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">        select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">new</span><span style="color:#E1E4E8">() { packageName }) };</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> parser.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(code);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Run the tests, you’ll get 🟢. Now, before we go on to <em>refactor</em>, I want to improve the test we just made, and make it more generic.</p>
+<p>The test is only accounting for a package name with a single word. This is not enough, and maybe you already guessed that composed identifiers will fail. We’ll add some other examples, and the best source for those is - you’ve guessed it! - the Authenticator source code.</p>
+<blockquote>
+<p>You may realize that we are also not accounting for possible identifiers that those that have letters or symbols such as underscore. But in keeping with our goal, we don’t need a parser that will read every legal Java code ever written, instead, just something that will parse the source we’re dealing with. This might not be the case on other projects where you need a parser - for instance, maybe you don’t have full access to the code before running the parser, and in that case, you’ll need to take a deep dive into the language definition.
+Likewise, our parser isn’t trying to validate the code that it’s consuming - whatever we find on those files we accept that it’s valid Java. Again, you may want to take a different approach, for instance if this parser is going to be fed code written just for it, since then you’ll have people making mistakes and you’ll need to tell them what those are.</p>
+</blockquote>
+<p>To find the examples of packages, I just used VSCode to open the directory where the code is, <code>java/com/google/android/apps/authenticator/</code>, and went to search:</p>
+<img src="/assets/2021-02-13-parsing-code-with-sprache/vscode-search-example.png" alt="Search Box in VSCode">
+<p>And now we turn the test from <code>Fact</code> to <code>Theory</code> using some of those names:</p>
+<blockquote>
+<p>I eyeballed the list of packages and picked those that I found to be representative of the domain of the name. We’ll, afterward, parse everything but it’s important that before that we already have some good testing in place.</p>
+</blockquote>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">Theory</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"tinyJavaParser"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"com.google.android.apps.authenticator"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"com.google.android.apps.authenticator.enroll2sv.wizard"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenValidPackage_ReturnsName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> packageName</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    var</span><span style="color:#B392F0"> packageExpresison</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> $"package {</span><span style="color:#E1E4E8">packageName</span><span style="color:#9ECBFF">};"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    var</span><span style="color:#B392F0"> sut</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageNameParser</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> sut.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(packageExpresison);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(packageName, </span><span style="color:#F97583">string</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Join</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">, actual.Identifiers));</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Take your time understanding the changes we’ve made to the test. Remember that the <em>refactor</em> step applies also to tests so, while we <em>could</em> keep the test as it was and just add a new theory, this is cleaner, i.e., easier to maintain.</p>
+<p>Now we run the tests and, of course, 🔴. Time to correct the code.</p>
+<p>First we try to fix it for <em>com.google.android.apps.authenticator</em>, by accounting for multiple identifiers:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#B392F0"> PackageName</span><span style="color:#B392F0"> Parse</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> code</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (code </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ArgumentNullException</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">nameof</span><span style="color:#E1E4E8">(code));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">identifierParser</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Sprache.Parse.Letter.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Text</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">parser</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> packageKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"package"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> space</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.WhiteSpace.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> packageHead</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> identifierParser</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> packageTail</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">from</span><span style="color:#B392F0"> delimiter</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">                                from</span><span style="color:#B392F0"> identifier</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> identifierParser</span></span>
+<span class="line"><span style="color:#F97583">                                select</span><span style="color:#E1E4E8"> identifier).</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">        from</span><span style="color:#B392F0"> terminator</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">        select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8"> { Identifiers </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">new</span><span style="color:#E1E4E8">[] { packageHead }).</span><span style="color:#B392F0">Concat</span><span style="color:#E1E4E8">(packageTail).</span><span style="color:#B392F0">ToList</span><span style="color:#E1E4E8">() };</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> parser.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(code);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Let’s once again dissect the code.</p>
+<p>We begin by creating a “sub parser”, so to speak, that reads an identifier. It should be very straightforward since it’s the same code that we had before - get as many letters in sequence as possible, and convert it to “text”, i.e., a <code>string</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#B392F0">Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">identifierParser</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Sprache.Parse.Letter.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Text</span><span style="color:#E1E4E8">();</span></span></code></pre>
+<p>Now we increment the old parsing rules to account for repetitions of identifiers. We do this by getting at least the first identifier and then, optionally, many others. <code>packageTail</code> also uses a sub parser that I didn’t declare, so it’s inlined because it only makes sense inside this parser.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">from</span><span style="color:#B392F0"> packageHead</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> identifierParser</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#B392F0"> packageTail</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">from</span><span style="color:#B392F0"> delimiter</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">                        from</span><span style="color:#B392F0"> identifier</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> identifierParser</span></span>
+<span class="line"><span style="color:#F97583">                        select</span><span style="color:#E1E4E8"> identifier).</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span></code></pre>
+<p>Finally, we need to create a list from the single identifier <code>packageHead</code> and the multiples in <code>packageTail</code>, so I cheated a bit:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#E1E4E8">select </span><span style="color:#F97583">new</span><span style="color:#E1E4E8"> PackageName { Identifiers </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">new</span><span style="color:#E1E4E8">[] { packageHead }).</span><span style="color:#B392F0">Concat</span><span style="color:#E1E4E8">(packageTail).</span><span style="color:#B392F0">ToList</span><span style="color:#E1E4E8">() };</span></span></code></pre>
+<p>I create an array with just the packageHead (<code>new[] { packageHead }</code>) and concatenate it with <code>packageTail</code>. After that, I just call <code>ToList()</code> to turn the resulting array into a list.</p>
+<p>This will test green 🟢 for <code>"com.google.android.apps.authenticator"</code>, but still fails for <code>"com.google.android.apps.authenticator.enroll2sv.wizard"</code>. Let’s take a look at the error:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Message: </span></span>
+<span class="line"><span>    Sprache.ParseException : Parsing failure: unexpected '2'; expected ; (Line 1, Column 53); recently consumed: tor.enroll</span></span></code></pre>
+<p>Sprache is telling us there’s a <code>2</code> it didn’t expect in the stream, and that it just had consumed <code>"tor.enroll"</code>. If we look at the input string, it’s easy to see why it fails:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>                         Just read from here</span></span>
+<span class="line"><span>                                  ↓</span></span>
+<span class="line"><span>com.google.android.apps.authenticator.enroll2sv.wizard</span></span>
+<span class="line"><span>                                            ↑</span></span>
+<span class="line"><span>                                      Failed here</span></span></code></pre>
+<p>So, as expected, the number 2 isn’t allowed. This is just a matter of expanding the <code>identifierParser</code> definition to take that into account:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#B392F0">Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">identifierParser</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Sprache.Parse.LetterOrDigit.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Text</span><span style="color:#E1E4E8">();</span></span></code></pre>
+<p>Run tests and appreciate your 🟢!</p>
+<h2 id="refactor">Refactor!</h2>
+<p>Now it’s time we refactor the code. We will look at how to make our code simpler to maintain and use.</p>
+<p>There two things that we should take notice of:</p>
+<ul>
+<li>
+<p>In <code>PackageNameParser.Parse</code> we create two parser instances, <code>identifierParser</code> and <code>parser</code>. They are then used only once, right at the return. Multiple calls to this method result in recreating those instances, but they can be reused. This is made evident by Sprache docs as well.</p>
+</li>
+<li>
+<p>We defined an <code>IParser&#x3C;T></code> interface, and Sprache has a <code>Parser&#x3C;out T></code> delegate, which is very close to ours. Sprache can define parsers using its delegate, and we can combine those to produce new, more complex, parsers.</p>
+</li>
+</ul>
+<p>With this knowledge, we should refactor our code to define once and use the parsers multiple times; We should also ditch our parsing interface and use Sprache’s delegate. Sprache way of doing things is defining those delegates as static members of a class, so we could create:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> JavaGrammar</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">Identifier</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Sprache.Parse.LetterOrDigit.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Text</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">PackageName</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">		from</span><span style="color:#B392F0"> packageKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"package"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">		from</span><span style="color:#B392F0"> space</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.WhiteSpace.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">		from</span><span style="color:#B392F0"> packageHead</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier</span></span>
+<span class="line"><span style="color:#F97583">		from</span><span style="color:#B392F0"> packageTail</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">from</span><span style="color:#B392F0"> delimiter</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">								from</span><span style="color:#B392F0"> identifier</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier</span></span>
+<span class="line"><span style="color:#F97583">								select</span><span style="color:#E1E4E8"> identifier).</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">		from</span><span style="color:#B392F0"> terminator</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">		select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">new</span><span style="color:#E1E4E8">[] { packageHead }.</span><span style="color:#B392F0">Concat</span><span style="color:#E1E4E8">(packageTail).</span><span style="color:#B392F0">ToList</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>And changing the tests to reflect that:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> PackageNameParserTests</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#E1E4E8">    [</span><span style="color:#B392F0">Fact</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenCodeNull_Throws</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#E1E4E8">        Assert.</span><span style="color:#B392F0">Throws</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ArgumentNullException</span><span style="color:#E1E4E8">>(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> JavaGrammar.PackageName.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">));</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    [</span><span style="color:#B392F0">Theory</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    [</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"tinyJavaParser"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#E1E4E8">    [</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"com.google.android.apps.authenticator"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#E1E4E8">    [</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"com.google.android.apps.authenticator.enroll2sv.wizard"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenValidPackage_ReturnsName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> packageName</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        var</span><span style="color:#B392F0"> packageExpresison</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> $"package {</span><span style="color:#E1E4E8">packageName</span><span style="color:#9ECBFF">};"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> JavaGrammar.PackageName.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(packageExpresison);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(packageName, </span><span style="color:#F97583">string</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Join</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">, actual.Identifiers));</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<blockquote>
+<p>❗ If you’re getting an error that the delegate doesn’t have a Parse method, fret not! You just have to add a <code>using Sprache;</code> directive at the top of the file.</p>
+</blockquote>
+<p>You can remove the IParser interface that we created to help us define how the code should look like.</p>
+<h1 id="review">Review</h1>
+<p>Ufs, that was long! 😩We’ve seen a lot! Let’s review all that for a moment, shall we?</p>
+<ul>
+<li>You’ve learned that language syntaxes are governed by <em>grammars</em> and that those can be expressed with a notation known as BNF or EBNF.</li>
+<li>You’ve created a simplified EBNF for Java, taking into account only what was in scope. You know we call this <em>best fit</em>, and an agile principle that is similar to YAGNI - build only what you’re going to use.</li>
+<li>You’ve created a bunch of test cases, mostly derived from the problem domain itself - the source from Google’s Authenticator.</li>
+<li>You’ve learned how to combine Sprache parsers to create another, more complex parser.</li>
+</ul>
+<p>This has laid the foundation for parsing the more complex program structures. In the next article, we’ll finish our grammar by creating more parsers that can deal with the whole source. I will also show you how to deal with comments and how to “skip” code that you’re not interested in. Following that article, as a bonus, we’ll finish building our tool and outputting the graph that will show users the relationship between classes.</p>
+<p>All code produced thus far has been stored at <a href="https://github.com/bruno-brant/dotnet-java-dependency-analyser">Github</a>. You’re welcome to fork it and use it in whichever way you want. To get the exact version of this code, use <a href="https://github.com/bruno-brant/dotnet-java-dependency-analyser/releases/tag/FirstArticle">this tag</a>.</p>  </div> <br> <div class="tag-list">  <a href="/tags/#dotnet">#dotnet</a>   <a href="/tags/#programming">#programming</a>   <a href="/tags/#language">#language</a>   <a href="/tags/#sprache">#sprache</a>   <a href="/tags/#tdd">#tdd</a>  </div> </article> <div class="PageNavigation"> <a class="prev" href="/en/blog/2021-02-17-read-my-blog-in-portuguese">
+← Previous
+</a> <a class="next" href="/en/blog/2020-10-31-happy-halloween-blog-is-back">
+Next →
+</a> </div> <aside class="related"> <h3>Related Posts</h3> <ul class="related-posts"> <li> <a href="/blog/en/2020-10-31-happy-halloween-blog-is-back"> Happy Halloween! My blog is back! <small> <time datetime="2020-10-31T18:00:00.000Z"> October 31, 2020 </time> </small> </a> </li><li> <a href="/blog/en/2021-02-17-read-my-blog-in-portuguese"> Read my blog in portuguese or english! <small> <time datetime="2021-02-17T00:00:00.000Z"> February 17, 2021 </time> </small> </a> </li><li> <a href="/blog/en/2024-11-29-excellent-talk-on-software-complexity"> Excellent Talk On Software Complexity <small> <time datetime="2024-11-29T00:00:00.000Z"> November 29, 2024 </time> </small> </a> </li> </ul> </aside> </main>  </main> <footer class="footer"> <div class="wrapper"> <div>
+© Copyright 2025 Bruno Brant.
+<span>
+Theme based on <a href="https://github.com/essentialenemy/noir/">Noir</a>
+by <a href="https://essentialenemy.com/">Victor Johnson</a>.
+</span> </div> <div class="social-links"> <ul class="social-media-list"> <li> <a rel="me" href="https://github.com/bruno-brant" title="bruno-brant"> <svg class="svg-icon grey"> <use href="/minima-social-icons.svg#github"></use> </svg> </a> </li><li> <a rel="me" href="https://www.linkedin.com/in/brunobrant" title="brunobrant"> <svg class="svg-icon grey"> <use href="/minima-social-icons.svg#linkedin"></use> </svg> </a> </li> </ul> </div> </div> </footer> </div> <script>
+      /* Toggle between adding and removing the "responsive" class to topnav when the user clicks on the icon */
+      function openNavigation() {
+        const navigationElems = document.getElementsByClassName("navigation");
+
+        if (navigationElems.length != 1) {
+          console.warn("Couldn't find navbar");
+          return;
+        }
+
+        const x = navigationElems[0];
+        if (x.className === "navigation") {
+          x.className += " responsive";
+        } else {
+          x.className = "navigation";
+        }
+      }
+    </script> </body> </html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html><html lang="pt-br"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta property="og:image" content="/technology-matters.svg"><title>Analisando código com Sprache - Parte 2 · TECHNOLOGY MATTERS</title><link rel="shortcut icon" href="/favicon.ico"><link rel="alternate" type="application/atom+xml" title="TECHNOLOGY MATTERS" href="/rss.xml"><!-- Country flags from open source project--><link rel="stylesheet" type="text/css" href="/styles/flags16-both.css"><!-- Analytics script --><script>
+		if(!sessionStorage.getItem("_swa") && document.referrer.indexOf(location.protocol+"//"+location.host) !== 0) {
+			fetch("https://counter.dev/track?" + new URLSearchParams({
+				referrer: document.referrer,
+				screen: screen.width + "x" + screen.height,
+				user: "HeavyStorm",
+				utcoffset: "-3"
+			}));
+		}
+		sessionStorage.setItem("_swa", "1");
+	</script><link rel="stylesheet" href="/_astro/_slug_.C4Cg-swM.css"></head><body> <div class="container content"> <header class="masthead"> <h3 class="masthead-title"> <a href="/pt-br/" title="Home" class="masthead-title-main"> TECHNOLOGY MATTERS </a> <br> <small>pensamentos desordenados sobre tecnologia, software, etc.</small> </h3> <!-- Navigation --> <div class="navigation"> <ul id="navigation-list"> <li class> <a href="/pt-br/">INÍCIO</a> </li> <li class> <a href="/pt-br/archive/">ARQUIVO</a> </li> <li> <a href="/pt-br/tags/">TAGS</a> </li> <li> <a href="/pt-br/categories/">CATEGORIAS</a> </li> <li class> <a href="/pt-br/about/">SOBRE</a> </li> <li id="subscribe"> <a href="/rss.xml"> <p>ASSINAR</p> <svg class="svg-icon grey" style="fill: #f66a0a;"> <use xlink:href="/minima-social-icons.svg#rss"></use> </svg> </a> </li> </ul> <div style="float:right"> <a href="javascript:void(0);" class="navigation-icon" onclick="openNavigation()">&#9776;</a> </div> </div> <!-- Language selector --> <script>(function(){const pathWithoutLocale = "/blog/2021-03-13-parsing-code-with-sprache-part-2/";
+const locales = ["en","pt-br"];
+
+	document.setPreferredLanguage = function (path, locale) {
+		localStorage.setItem("preferredLanguage", locale);
+		window.location.href = `/${path}${pathWithoutLocale}`;
+	}
+})();</script> <div class="language-selector f16"> <span class="language-selector-label">ler esse site em:</span>  <a onclick="document.setPreferredLanguage('en', 'en'); return false;" href="#"> <img class="flag us" style="vertical-align:middle;margin-bottom:-0.0em" src="/Transparent32x32.png" alt="Português"> </a>  |  <a onclick="document.setPreferredLanguage('pt-br', 'pt-br'); return false;" href="#"> <img class="flag br" style="vertical-align:middle;margin-bottom:-0.0em" src="/Transparent32x32.png" alt="Português"> </a>  </div> </header> <main>  <main> <article class="post"> <h1 class="post-title">Analisando código com Sprache - Parte 2</h1> <time datetime="2021-03-13T10:00:00.000Z" class="post-date"> March 13, 2021  in  <a href="/categories/#desenvolvimento">Desenvolvimento</a>   <br> <i>Last updated on: March 13, 2021</i>  </time>  <div class="content">  <blockquote>
+<p>😎 Este é o segundo artigo de uma série de múltiplas partes sobre <strong>como analisar código com Sprache</strong>. Você pode ler a primeira parte <a href="2021-02-13-parsing-code-with-sprache">aqui</a>.</p>
+</blockquote>
+<p>No post anterior, vimos como analisar algum texto (em particular, código Java) usando <a href="https://github.com/sprache/Sprache">Sprache</a>, uma poderosa biblioteca para C#. Vimos como usar uma abordagem incremental e como usar testes unitários para conduzir o desenvolvimento com esta ferramenta. Até agora, escrevemos um analisador para <code>Identifier</code> e <code>PackageName</code> (verifique <a href="https://github.com/bruno-brant/dotnet-java-dependency-analyser/blob/c5f7f6ce78382ac47e8ab0d03ca43851425d1545/src/TinyJavaParser/JavaGram.cs">aqui</a>).</p>
+<p>Agora vamos avançar um pouco mais rápido. Lembre-se de que temos como alvo o source Java/Android <a href="https://github.com/google/google-authenticator-android/tree/master/java/com/google/android/apps/authenticator">Google Authenticator</a> e que nosso objetivo final é gerar um gráfico de dependências de classe para este projeto. Neste artigo, vamos tentar analisar todos os elementos de nível superior do arquivo atual em que estamos trabalhando, <a href="https://github.com/google/google-authenticator-android/blob/master/java/com/google/android/apps/authenticator/AuthenticatorActivity.java">AuthenticatorActivity.java</a>.</p>
+<!--more-->
+<blockquote>
+<p>❗ Em todo o código do blog, eliminei a documentação interna para maior clareza. Verifique o <a href="https://github.com/bruno-brant/dotnet-java-dependency-analyser">repo</a> para ver os comentários.</p>
+</blockquote>
+<h1 id="refatorando-nosso-caminho-para-o-sucesso">Refatorando nosso caminho para o sucesso</h1>
+<p>Antes de incrementar o código atual, identifiquei um pequeno ajuste que nos ajudará na próxima etapa. Veja, o analisador <code>PackageName</code> está, na verdade, analisando uma <em>instrução package (package statement)</em>. Nomes de pacotes são usados ​​em outros lugares, portanto, facilitaremos a reutilização extraindo um <code>PackageName</code> do analisador atual.</p>
+<p>Primeiro, renomeie o analisador <code>JavaGrammar.PackageName</code> para <code>JavaGrammar.PackageStament</code>, o nome correto para o que está analisando; use suas ferramentas de refatoração de IDE para isso. Você também precisa renomear a unidade de teste anterior de <code>PackageNameParserTests</code> para <code>PackageStatementParserTests</code> para manter as coisas coerentes.</p>
+<p>A seguir, vamos extrair a análise de um <code>PackageName</code> de <code>JavaGrammar.PackageStament</code>. Veja as linhas abaixo:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">PackageStatement</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"package"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> space</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.WhiteSpace.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#6A737D">	// ↓↓↓↓↓↓↓ Parsing of Package Name ↓↓↓↓↓↓↓</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageHead</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageTail</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">from</span><span style="color:#B392F0"> delimiter</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">							from</span><span style="color:#B392F0"> identifier</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier</span></span>
+<span class="line"><span style="color:#F97583">							select</span><span style="color:#E1E4E8"> identifier).</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#6A737D">	// ↑↑↑↑↑↑↑ Parsing of Package Name ↑↑↑↑↑↑↑</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> terminator</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#6A737D">	// ↓↓↓↓↓↓↓ And this is how the result is build ↓↓↓↓↓↓↓</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">new</span><span style="color:#E1E4E8">[] { packageHead }.</span><span style="color:#B392F0">Concat</span><span style="color:#E1E4E8">(packageTail).</span><span style="color:#B392F0">ToList</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#6A737D">	// ↑↑↑↑↑↑↑ And this is how the result is build ↑↑↑↑↑↑↑↑</span></span></code></pre>
+<p>Vamos extrair isso em um analisador isolado, este na verdade chamado <code>PackageName</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">PackageName</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageHead</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageTail</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">from</span><span style="color:#B392F0"> delimiter</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">						 from</span><span style="color:#B392F0"> identifier</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier</span></span>
+<span class="line"><span style="color:#F97583">						 select</span><span style="color:#E1E4E8"> identifier).</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">new</span><span style="color:#E1E4E8">[] { packageHead }.</span><span style="color:#B392F0">Concat</span><span style="color:#E1E4E8">(packageTail).</span><span style="color:#B392F0">ToList</span><span style="color:#E1E4E8">());</span></span></code></pre>
+<p>Precisamos criar uma estrutura para representar a <em>instrução package</em>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> PackageStatement</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> PackageStatement</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">PackageName</span><span style="color:#B392F0"> packageName</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#E1E4E8">		PackageName </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> packageName;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> PackageName</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Vamos atualizar o analisador <code>PackageStatement</code> para retornar a estrutura, usando o analisador<code> PackageName</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">PackageName</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">PackageStatement</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"package"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> space</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.WhiteSpace.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageName</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> PackageName</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> terminator</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Sprache.Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#E1E4E8"> packageName;</span></span></code></pre>
+<p>Execute todos os testes e você descobrirá que tudo está funcionando como deveria. Esta refatoração foi confirmada sob a tag <a href="https://github.com/bruno-brant/dotnet-java-dependency-analyser/tree/Refactor_PackageName">Refactor_PackageName</a>.</p>
+<h1 id="analisando-mais-estruturas">Analisando mais estruturas</h1>
+<p>Vamos voltar à criação de novos analisadores. A próxima estrutura natural é uma declaração de importação que tem o seguinte BNF:</p>
+<h2 id="declaração-de-importação">Declaração de importação</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>IMPORT = "import", PACKAGE_NAME, ";";</span></span></code></pre>
+<p>Vamos começar atualizando nossa classe <code>Import</code> anterior. Mude seu nome de <code>Import</code> para <code>ImportStatement</code>, que é mais exato. <strong>Use sua ferramenta de refatoração IDE para renomear a classe.</strong> Eu também criei um construtor para ela que inicializa o <code>PackageName</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> ImportStatement</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> ImportStatement</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">PackageName</span><span style="color:#B392F0"> packageName</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#E1E4E8">		PackageName </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> packageName;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> PackageName</span><span style="color:#B392F0"> PackageName</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Agora, vamos criar um teste para isso:</p>
+<blockquote>
+<p>😎 Estou criando um arquivo de teste para cada analisador, embora eles (atualmente)  sejam todos parte da mesma classe. Isso não é <em>padrão</em>; é a melhor prática ter uma classe de teste de unidade <em>por classe</em>. Entretanto, fazer dessa forma torna mais fácil localizar os testes e nos permite mantê-los mais organizados.</p>
+</blockquote>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> ImportStatementParserTests</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">Theory</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"import android.annotation.TargetApi;"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"import android.app.Activity;"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenValidPackageName_ReturnsStructureWithCorrectName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> importStatement</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> JavaGrammar.ImportStatement.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(importStatement);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(packageName, </span><span style="color:#F97583">string</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Join</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">, actual.PackageName.Identifiers));</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Usamos as primeiras instruções de <code>import</code> de <code>AuthenticatorActivity</code>, como você pode ver. Também estamos fazendo um <code>join</code> dos identificadores assim como fizemos da última vez, o que é um pouco tedioso; vamos melhorar isso na etapa de <em>refatorar</em>.</p>
+<p>A execução desse teste levará a 🔴, pois o código não foi implementado. Vamos escrever o analisador agora:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ImportStatement</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">ImportStatement</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> importKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"import"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> packageName</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> PackageName.</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> delimiter</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">';'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ImportStatement</span><span style="color:#E1E4E8">(packageName);</span></span></code></pre>
+<p>Leitores ávidos notarão o método anteriormente não visto <code>Token()</code> na segunda linha. Este é um dos métodos mais úteis no Sprache - removerá os espaços em branco ao redor do caractere, mas * exigirá * que ele esteja lá. Isso significa que, por exemplo, <code>Parse.String("import").Token().Parse("   import    ")</code> funcionará, mas <code>Parse.String("import").Token().Parse("   importasd    ")</code> não.</p>
+<p>O resto deve ser muito legível - procure a palavra-chave <code>import</code>, depois uma estrutura PackageName e retorne uma instrução import. <strong>Execute todos os testes.</strong> Você deve obter um 🟢.</p>
+<p>Continuando, vamos refatorar um pouco. Lembra que eu disse que faríamos algo sobre <code>string.Join('.', actual.PackageName.Identifiers)</code>? Agora é a hora!</p>
+<p>A representação de string de um nome de pacote, digamos, “android.content.ActivityNotFoundException” não é outro senão “android.content.ActivityNotFoundException”. Então, o que você acha de substituir <code>PackageName.ToString</code> para cumprir esse comportamento?</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> PackageName</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#6A737D">	// ...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		return</span><span style="color:#F97583"> string</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Join</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'.'</span><span style="color:#E1E4E8">, Identifiers);</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<blockquote>
+<p>😎 <strong>DICA:</strong> Ao realizer um <code>override</code> em métodos e propriedades, use o xml doc <code>/// &#x3C;inheritdoc /></code> como documentação.</p>
+</blockquote>
+<p>Agora, seguindo a mesma ideia, podemos adicionar uma substituição de <code>ToString</code> em <code>ImportStatement</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> ImportStatement</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#6A737D">	// ...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		return</span><span style="color:#9ECBFF"> $"import {</span><span style="color:#E1E4E8">PackageName</span><span style="color:#9ECBFF">};"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Agora podemos atualizar nosso teste de unidade para refletir este refator:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">Theory</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"import android.annotation.TargetApi;"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"import android.app.Activity;"</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenValidPackageName_ReturnsStructureWithCorrectName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> importStatement</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> JavaGrammar.ImportStatement.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(importStatement);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">	Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(importStatement, actual.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<blockquote>
+<p>⚠ <strong>Aviso</strong>: neste caso, a entrada é formatada exatamente como a saída de <code>ImportStatement.ToString</code>. No entanto, se você analisar algo como <code>" import    name.surname"</code>, enquanto a análise funcionará, o <code>ToString</code> retornará <code>"import name.surname"</code>, sem espaços. Isso significa que a regra <code>Token ()</code> não está sendo testada em nossa suíte - a razão para isso é que ela não aparece em nosso escopo - portanto, os testes são um pouco frágeis e devem ser melhorados na maioria das circunstâncias. Não vou fazer isso durante esses exercícios, mas os leitores devem definitivamente fazê-lo.</p>
+</blockquote>
+<p>Agora, precisamos ler um bloco de importações em nosso arquivo. Chamamos isso de IMPORT_LIST no eBNF. A estrutura de dados para isso não precisa ser mais do que <code>List &#x3C;ImportStatement></code>, mas precisamos de um analisador para isso. Comece com um teste:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> ImportListParserTests</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> static</span><span style="color:#B392F0"> IEnumerable</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">object</span><span style="color:#E1E4E8">[]> </span><span style="color:#B392F0">ImportLists</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		yield</span><span style="color:#F97583"> return</span><span style="color:#F97583"> new</span><span style="color:#F97583"> string</span><span style="color:#E1E4E8">[]</span></span>
+<span class="line"><span style="color:#E1E4E8">		{</span></span>
+<span class="line"><span style="color:#9ECBFF">			@"</span></span>
+<span class="line"><span style="color:#9ECBFF">import com.google.android.apps.authenticator.util.EmptySpaceClickableDragSortListView;</span></span>
+<span class="line"><span style="color:#9ECBFF">import com.google.android.apps.authenticator.util.annotations.FixWhenMinSdkVersion;</span></span>
+<span class="line"><span style="color:#9ECBFF">import com.google.android.apps.authenticator2.R;</span></span>
+<span class="line"><span style="color:#9ECBFF">import com.google.common.annotations.VisibleForTesting;</span></span>
+<span class="line"><span style="color:#9ECBFF">			"</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Trim</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">		};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">		yield</span><span style="color:#F97583"> return</span><span style="color:#F97583"> new</span><span style="color:#F97583"> string</span><span style="color:#E1E4E8">[]</span></span>
+<span class="line"><span style="color:#E1E4E8">		{</span></span>
+<span class="line"><span style="color:#9ECBFF">			@"</span></span>
+<span class="line"><span style="color:#9ECBFF">import android.support.v7.widget.Toolbar;</span></span>
+<span class="line"><span style="color:#9ECBFF">import android.text.Html;</span></span>
+<span class="line"><span style="color:#9ECBFF">import android.util.Log;</span></span>
+<span class="line"><span style="color:#9ECBFF">import android.view.ActionMode;</span></span>
+<span class="line"><span style="color:#9ECBFF">import android.view.ContextMenu;</span></span>
+<span class="line"><span style="color:#9ECBFF">			"</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Trim</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">		};</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">Theory</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">MemberData</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">nameof</span><span style="color:#E1E4E8">(ImportLists))]</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenValidPackageName_ReturnsStructureWithCorrectName</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> importList</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		var</span><span style="color:#B392F0"> expected</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> importList.</span><span style="color:#B392F0">Split</span><span style="color:#E1E4E8">(Environment.NewLine).</span><span style="color:#B392F0">ToList</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">		var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> JavaGrammar.ImportList.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(importList);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(expected, actual.</span><span style="color:#B392F0">Select</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">_</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> _.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">()));</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>A implementação da lista é simples:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ImportStatement</span><span style="color:#E1E4E8">>> </span><span style="color:#B392F0">ImportList</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> statements</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> ImportStatement.</span><span style="color:#B392F0">Many</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#E1E4E8"> statements.</span><span style="color:#B392F0">ToList</span><span style="color:#E1E4E8">();</span></span></code></pre>
+<p>Agora que as importações foram tratadas, vamos passar para a próxima estrutura de código em <code>AuthenticatorActivity.java</code>, uma <em>anotação</em>.</p>
+<h2 id="anotações">Anotações</h2>
+<p>A próxima estrutura de código em <code>AuthenticatorActivity</code> é a declaração da classe. Ele contém um trecho de código sobre o qual não falamos antes, uma anotação.</p>
+<p>As anotações Java são análogas aos atributos C# e têm a seguinte aparência:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="java"><code><span class="line"><span style="color:#E1E4E8">@</span><span style="color:#F97583">FixWhenMinSdkVersion</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">11</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p>Assim como no C#, essas estruturas só podem aparecer antes das declarações e, neste caso, é uma declaração de classe. Precisamos criar a estrutura de dados para acomodar isso e o analisador para produzi-la.</p>
+<p>Conforme mencionado anteriormente, estamos construindo interativamente o eBNF. Isso é para tornar nosso analisador mais simples - apenas escrever o código necessário para as estruturas que estão presentes no código-fonte. É por isso que a anotação não foi mencionada antes. Vamos atualizá-lo:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>ANNOTATION = "@", IDENTIFIER, "(", ARGUMENT_LIST, ")"</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>ARGUMENT_LIST = ARGUMENT, { "," ARGUMENT }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>ARGUMENT = LITERAL</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>LITERAL = INTEGER_LITERAL</span></span></code></pre>
+<p><strong>O eBNF acima é parcial</strong>; Por exemplo, a lista de argumentos para a anotação é mais complexa, permitindo outros tipos. Mas até agora só temos o parâmetro inteiro, então vamos nos ater a ele.</p>
+<p>A primeira coisa é definir a estrutura de dados de uma anotação. Olhando para ele, você pode imaginar que tem um identificador como nome e, em seguida, a lista de argumentos.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> interface</span><span style="color:#B392F0"> ILiteral</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	object</span><span style="color:#B392F0"> Value</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> IntegerLiteral</span><span style="color:#E1E4E8">  : </span><span style="color:#B392F0">ILiteral</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> IntegerLiteral</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">int</span><span style="color:#B392F0"> value</span><span style="color:#E1E4E8">) </span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#E1E4E8">		Value </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> value;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> int</span><span style="color:#B392F0"> Value</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; } </span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	object</span><span style="color:#B392F0"> ILiteral</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Value</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> Value;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		return</span><span style="color:#E1E4E8"> Value.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> Annotation</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> Annotation</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> name</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ILiteral</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">arguments</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#E1E4E8">		Name </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> name;</span></span>
+<span class="line"><span style="color:#E1E4E8">		Arguments </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> arguments;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> Name</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Argument</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">Arguments</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		return</span><span style="color:#9ECBFF"> $"@{</span><span style="color:#E1E4E8">Name</span><span style="color:#9ECBFF">}({</span><span style="color:#F97583">string</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">Join</span><span style="color:#9ECBFF">(", ", </span><span style="color:#E1E4E8">Arguments</span><span style="color:#9ECBFF">)})"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Introduzimos um pouco de abstração que pode nos poupar algum trabalho mais tarde - deixamos claro que literal pode ser muitas coisas, não apenas inteiros. A conversão para a estrutura correta permitirá que os usuários obtenham o valor digitado - caso contrário, por enquanto, encaixaremos o int e o retornamos como um objeto.</p>
+<p>Precisamos criar um analisador para essa nova estrutura - um literal inteiro.</p>
+<p>Testes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> IntergerLiteralParserTests</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">Theory</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">11</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> MyTheory</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">int</span><span style="color:#B392F0"> value</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> JavaGrammar.IntegerLiteral.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(value.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(value, actual.Value);</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>E o analisador:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">IntegerLiteral</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">IntegerLiteral</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> digits</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.Digit.</span><span style="color:#B392F0">AtLeastOnce</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	let</span><span style="color:#B392F0"> number</span><span style="color:#F97583"> =</span><span style="color:#F97583"> string</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Concat</span><span style="color:#E1E4E8">(digits)</span></span>
+<span class="line"><span style="color:#F97583">	let</span><span style="color:#B392F0"> value</span><span style="color:#F97583"> =</span><span style="color:#F97583"> int</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(number)</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> IntegerLiteral</span><span style="color:#E1E4E8">(value);</span></span></code></pre>
+<p>Uma coisa no código acima que pode fazer você se perguntar é o <code>AtLeastOnce()</code>. Isso é muito próximo de <code>Many()</code>, com a diferença de que irá falhar na análise quando não houver pelo menos um único dígito. Se não aplicarmos isso aqui, o analisador aceitará uma lista de argumentos vazia.</p>
+<p>Agora vamos para a anotação real.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> AnnotationParserTests</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">Theory</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">InlineData</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"@Number(11)"</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">new</span><span style="color:#F97583"> object</span><span style="color:#E1E4E8">[] { </span><span style="color:#79B8FF">11</span><span style="color:#E1E4E8"> })]</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_WhenAnnotationHasParameters_CorrectParameters</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> annotation</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">object</span><span style="color:#E1E4E8">[] </span><span style="color:#B392F0">parameters</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> JavaGrammar.Annotation.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(annotation);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(parameters, actual.Arguments.</span><span style="color:#B392F0">Cast</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">object</span><span style="color:#E1E4E8">>().</span><span style="color:#B392F0">ToArray</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<blockquote>
+<p>❗ Esses testes são muito básicos; na maioria dos cenários de produção, sugiro escrever testes que tenham mais condições; por exemplo, poderíamos testar casos como <code>@ SomeAnnotation</code>, dividindo o código em duas linhas, etc. Observe o código que está sendo testado para encontrar lacunas ou riscos e crie os testes correspondentes. Finalmente, com TDD devemos escrever um teste por vez e evoluir iterativamente.</p>
+<p>A razão pela qual podemos nos safar com testes tão simples é que sabemos com antecedência todo o código que precisa ser analisado, então podemos testar novamente um caso real e verificar se surgem bugs, mas mesmo assim, eu teria cuidado onde isso não apenas uma postagem no blog.</p>
+</blockquote>
+<p>A implementação irá alavancar o analisador <code>IntegerLiteral</code> que acabamos de codificar:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Annotation</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">Annotation</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> at</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'@'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Once</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> identifier</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier.</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> startList</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'('</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> literal</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> IntegerLiteral.</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">Optional</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> endList</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">Char</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">')'</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	let</span><span style="color:#B392F0"> arguments</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> literal.IsDefined</span></span>
+<span class="line"><span style="color:#F97583">		?</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ILiteral</span><span style="color:#E1E4E8">> { literal.</span><span style="color:#B392F0">Get</span><span style="color:#E1E4E8">() }</span></span>
+<span class="line"><span style="color:#F97583">		:</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> List</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ILiteral</span><span style="color:#E1E4E8">>()</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Annotation</span><span style="color:#E1E4E8">(identifier, arguments);</span></span></code></pre>
+<p>Novamente, podemos ver um analisador opcional sendo chamado. Para obter a lista real, precisamos fazer alguma ginástica LINQ - retornar uma lista com um único literal ou uma lista vazia. No futuro, provavelmente criaremos um analisador <code>ArgumentList</code> que deve substituir isso, mas até agora, não há necessidade.</p>
+<p>Os testes devem ser 🟢.</p>
+<h2 id="declaração-de-classe">Declaração de classe</h2>
+<p>A próxima coisa no arquivo é a definição real da classe. Vamos decompô-lo:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="java"><code><span class="line"><span style="color:#E1E4E8">@</span><span style="color:#F97583">FixWhenMinSdkVersion</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">11</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> AuthenticatorActivity</span><span style="color:#E1E4E8"> estende TestableActivity {</span></span>
+<span class="line"><span style="color:#6A737D">// ...</span></span></code></pre>
+<p>Este é um bom exemplo porque, de cara, lidaremos com <code>extends</code>, um caso comum, mas não basal. A anotação já foi cuidada, então vamos analisar a declaração da classe:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>visibility</span></span>
+<span class="line"><span>   │</span></span>
+<span class="line"><span>   │          identifier, class          identifier, base class</span></span>
+<span class="line"><span>   │                   │                          │</span></span>
+<span class="line"><span>┌──┴─┐       ┌─────────┴─────────┐         ┌──────┴───────┐</span></span>
+<span class="line"><span>public class AuthenticatorActivity extends TestableActivity </span></span>
+<span class="line"><span>       └─┬─┘                       └──┬──┘</span></span>
+<span class="line"><span>         │             interface inheritance keyword</span></span>
+<span class="line"><span>         │</span></span>
+<span class="line"><span>class declaration keyword</span></span></code></pre>
+<p>Portanto, precisamos expandir o EBNF:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>CLASS_DECLARATION = VISIBILITY, "class", IDENTIFIER, { "extends", IDENTIFIER }, "{", (* ommited *), "}";</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>VISIBILITY = "public" </span></span></code></pre>
+<blockquote>
+<p>❗ Não estamos lidando com outras visibilidades apenas no momento, a não ser para refletir nossa abordagem em evolução. À medida que lidamos com mais casos, expandimos a definição.</p>
+</blockquote>
+<p>Isso deve ser realmente simples, mas precisamos atualizar a estrutura da classe para refleti-la:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> enum</span><span style="color:#B392F0"> Visibility</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">	Public</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> ClassDefinition</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#B392F0"> ClassDefinition</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Visibility</span><span style="color:#B392F0"> visibility</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">string</span><span style="color:#B392F0"> name</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">string</span><span style="color:#E1E4E8">? </span><span style="color:#B392F0">baseClass</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Annotation</span><span style="color:#E1E4E8">? </span><span style="color:#B392F0">annotation</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#E1E4E8">		Visibility </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> visibility;</span></span>
+<span class="line"><span style="color:#E1E4E8">		Name </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> name;</span></span>
+<span class="line"><span style="color:#E1E4E8">		BaseClass </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> baseClass;</span></span>
+<span class="line"><span style="color:#E1E4E8">		Annotation </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> annotation;</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">		public</span><span style="color:#B392F0"> Visibility</span><span style="color:#B392F0"> Visibility</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">		public</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> Name</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">		public</span><span style="color:#F97583"> string</span><span style="color:#E1E4E8">? </span><span style="color:#B392F0">BaseClass</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">		public</span><span style="color:#B392F0"> Annotation</span><span style="color:#E1E4E8">? </span><span style="color:#B392F0">Annotation</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">get</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Algumas coisas a serem observadas: estamos seguindo estritamente o trecho de código que está sendo processado, então, embora haja um membro Visibility, o único valor possível é <code>Public</code>; embora Java permita várias anotações, estamos apenas considerando uma única anotação etc. O motivo pelo qual estou seguindo essa abordagem é que ainda não sabemos se esses casos surgirão dentro do código. Se o fizerem, iremos reescrever o código acima.</p>
+<p>Agora vamos criar nossos testes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> ClassDefinitionParserTests</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#E1E4E8">	[</span><span style="color:#B392F0">Fact</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> void</span><span style="color:#B392F0"> Parse_AnnotatedClassWithExtends_CorrectParameters</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">	{</span></span>
+<span class="line"><span style="color:#F97583">		var</span><span style="color:#B392F0"> code</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> @"</span></span>
+<span class="line"><span style="color:#9ECBFF">@FixWhenMinSdkVersion(11)</span></span>
+<span class="line"><span style="color:#9ECBFF">public class AuthenticatorActivity extends TestableActivity</span></span>
+<span class="line"><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Trim</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">		var</span><span style="color:#B392F0"> actual</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> JavaGrammar.ClassDefinition.</span><span style="color:#B392F0">Parse</span><span style="color:#E1E4E8">(code);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"FixWhenMinSdkVersion"</span><span style="color:#E1E4E8">, actual.Annotation.Name);</span></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">11</span><span style="color:#E1E4E8">, actual.Annotation.Arguments[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">].Value);</span></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(Visibility.Public, actual.Visibility);</span></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"AuthenticatorActivity"</span><span style="color:#E1E4E8">, actual.Name);</span></span>
+<span class="line"><span style="color:#E1E4E8">		Assert.</span><span style="color:#B392F0">Equal</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"TestableActivity"</span><span style="color:#E1E4E8">, actual.BaseClass);</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Novamente, os testes lidam apenas com o que vimos até agora. Usei um <code>Fact</code> em vez de uma <code>Theory</code> porque estamos lidando apenas com um único caso. Assim que tivermos mais casos para testar, vou convertê-lo em <code>Theory</code>.</p>
+<p>Ah! Estou testando o resultado da análise de anotação, que na verdade está repetindo os testes já feitos no <code>AnnotationParserTests</code>. Poderíamos fazer isso de forma um pouco diferente e apenas ter certeza de que o analisador correto foi chamado, mas por enquanto, vamos manter isso simples e repetir o teste.</p>
+<p>Agora, a implementação, embora longa, é simples, apenas analise cada fragmento que vimos na análise acima:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="csharp"><code><span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Parser</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ClassDefinition</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">ClassDefinition</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> annotation</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Annotation.</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> visibility</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"public"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> classKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"class"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> className</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier.</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> extendsKeyword</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Parse.</span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"extends"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	from</span><span style="color:#B392F0"> baseClassName</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> Identifier.</span><span style="color:#B392F0">Token</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">	select</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ClassDefinition</span><span style="color:#E1E4E8">(Visibility.Public, className, baseClassName, annotation);</span></span></code></pre>
+<p>Eu cortei alguns cantos aqui, como analisar a visibilidade diretamente. Também lidaremos com isso quando for necessário.</p>
+<p>Faça seus testes e aprecie seu 🟢.</p>
+<h1 id="resumo">Resumo</h1>
+<p>Com este artigo, concluímos a primeira etapa: podemos analisar todos os elementos de nível superior de um arquivo de origem Java. Você aprendeu um pouco mais sobre como usar Sprache e combinar analisadores e provavelmente aprendeu algumas técnicas sobre como criar código <em>apto para o propósito</em>, usando uma abordagem orientada a testes e evoluindo o código anterior à medida que avançamos em nosso entendimento do domínio do problema, um processo denominado ** descoberta **.</p>
+<p>Todo o código produzido até agora foi armazenado em <a href="https://github.com/bruno-brant/dotnet-java-dependency-analyser">Github</a>. Você pode fazer um fork e usá-lo da maneira que quiser. Para obter a versão exata deste código, use <a href="https://github.com/bruno-brant/dotnet-java-dependency-analyser/releases/tag/SecondArticle">esta tag</a>.</p>
+<p>No próximo artigo, começaremos a analisar elementos de classe como construtores, campos e métodos. Estaremos ainda mais focados, lidando apenas com as estruturas de código que aparecem no código e, com sorte, poderemos terminar de analisar nossa primeira classe.</p>
+<p>Vejo você na próxima vez!</p>  </div> <br> <div class="tag-list">  <a href="/tags/#dotnet">#dotnet</a>   <a href="/tags/#programao">#programação</a>   <a href="/tags/#linguagem">#linguagem</a>   <a href="/tags/#sprache">#sprache</a>   <a href="/tags/#tdd">#tdd</a>  </div> </article> <div class="PageNavigation"> <a class="prev" href="/pt-br/blog/2024-11-29-excellent-talk-on-software-complexity">
+← Previous
+</a> <a class="next" href="/pt-br/blog/2021-02-17-read-my-blog-in-portuguese">
+Next →
+</a> </div> <aside class="related"> <h3>Related Posts</h3> <ul class="related-posts"> <li> <a href="/blog/en/2020-10-31-happy-halloween-blog-is-back"> Happy Halloween! My blog is back! <small> <time datetime="2020-10-31T18:00:00.000Z"> October 31, 2020 </time> </small> </a> </li><li> <a href="/blog/en/2021-02-17-read-my-blog-in-portuguese"> Read my blog in portuguese or english! <small> <time datetime="2021-02-17T00:00:00.000Z"> February 17, 2021 </time> </small> </a> </li><li> <a href="/blog/en/2024-11-29-excellent-talk-on-software-complexity"> Excellent Talk On Software Complexity <small> <time datetime="2024-11-29T00:00:00.000Z"> November 29, 2024 </time> </small> </a> </li> </ul> </aside> </main>  </main> <footer class="footer"> <div class="wrapper"> <div>
+© Copyright 2025 Bruno Brant.
+<span>
+Theme based on <a href="https://github.com/essentialenemy/noir/">Noir</a>
+by <a href="https://essentialenemy.com/">Victor Johnson</a>.
+</span> </div> <div class="social-links"> <ul class="social-media-list"> <li> <a rel="me" href="https://github.com/bruno-brant" title="bruno-brant"> <svg class="svg-icon grey"> <use href="/minima-social-icons.svg#github"></use> </svg> </a> </li><li> <a rel="me" href="https://www.linkedin.com/in/brunobrant" title="brunobrant"> <svg class="svg-icon grey"> <use href="/minima-social-icons.svg#linkedin"></use> </svg> </a> </li> </ul> </div> </div> </footer> </div> <script>
+      /* Toggle between adding and removing the "responsive" class to topnav when the user clicks on the icon */
+      function openNavigation() {
+        const navigationElems = document.getElementsByClassName("navigation");
+
+        if (navigationElems.length != 1) {
+          console.warn("Couldn't find navbar");
+          return;
+        }
+
+        const x = navigationElems[0];
+        if (x.className === "navigation") {
+          x.className += " responsive";
+        } else {
+          x.className = "navigation";
+        }
+      }
+    </script> </body> </html>
