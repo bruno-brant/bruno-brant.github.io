@@ -126,7 +126,7 @@ const locales = ["en","pt-br"];
 <span class="line"></span>
 <span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">()</span></span>
 <span class="line"><span style="color:#E1E4E8">	{</span></span>
-<span class="line"><span style="color:#F97583">		return</span><span style="color:#9ECBFF"> $"import {</span><span style="color:#E1E4E8">PackageName</span><span style="color:#9ECBFF">};"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">		return</span><span style="color:#9ECBFF"> $"import </span><span style="color:#9ECBFF">{</span><span style="color:#E1E4E8">PackageName</span><span style="color:#9ECBFF">}</span><span style="color:#9ECBFF">;"</span><span style="color:#E1E4E8">;</span></span>
 <span class="line"><span style="color:#E1E4E8">	}</span></span>
 <span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
 <p>Now we can update our unit test to reflect this refactor:</p>
@@ -235,7 +235,7 @@ const locales = ["en","pt-br"];
 <span class="line"></span>
 <span class="line"><span style="color:#F97583">	public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">()</span></span>
 <span class="line"><span style="color:#E1E4E8">	{</span></span>
-<span class="line"><span style="color:#F97583">		return</span><span style="color:#9ECBFF"> $"@{</span><span style="color:#E1E4E8">Name</span><span style="color:#9ECBFF">}({</span><span style="color:#F97583">string</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">Join</span><span style="color:#9ECBFF">(", ", </span><span style="color:#E1E4E8">Arguments</span><span style="color:#9ECBFF">)})"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">		return</span><span style="color:#9ECBFF"> $"@</span><span style="color:#9ECBFF">{</span><span style="color:#E1E4E8">Name</span><span style="color:#9ECBFF">}</span><span style="color:#9ECBFF">(</span><span style="color:#9ECBFF">{</span><span style="color:#F97583">string</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">Join</span><span style="color:#9ECBFF">(</span><span style="color:#9ECBFF">", "</span><span style="color:#9ECBFF">, </span><span style="color:#E1E4E8">Arguments</span><span style="color:#9ECBFF">)}</span><span style="color:#9ECBFF">)"</span><span style="color:#E1E4E8">;</span></span>
 <span class="line"><span style="color:#E1E4E8">	}</span></span>
 <span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
 <p>We have introduced a bit of abstraction that might save us some work later - we’ve made it clear that literal can be many things, no only integers. Casting it to the correct structure will enable users to get the typed value - otherwise, for now, we box the int and return it as an object.</p>
